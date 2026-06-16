@@ -49,7 +49,7 @@ export const MAJOR_COOLDOWNS: Record<HealerSpec, number[]> = {
     370537, // Stasis
     370960, // Emerald Communion
     406732, // Spatial Paradox (TWW)
-    374227, // Breath of Eons
+    374227, // Zephyr
   ],
   RestorationShaman: [
     98008,  // Spirit Link Totem
@@ -212,7 +212,7 @@ export const SPELL_NAMES: Record<number, string> = {
   370537: 'Stasis',
   370960: 'Emerald Communion',
   406732: 'Spatial Paradox',
-  374227: 'Breath of Eons',
+  374227: 'Zephyr',
   // Restoration Shaman
   98008:  'Spirit Link Totem',
   114052: 'Healing Tide Totem',

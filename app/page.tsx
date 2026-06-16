@@ -77,6 +77,7 @@ export default function Home() {
 
   const [minDurationStr, setMinDurationStr] = useState('');
   const [maxDurationStr, setMaxDurationStr] = useState('');
+  const [minFrequency, setMinFrequency] = useState(30);
   const [showLogs, setShowLogs] = useState(false);
 
   const [generating, setGenerating] = useState(false);
@@ -135,6 +136,7 @@ export default function Home() {
           logCount,
           minDuration: parseDuration(minDurationStr) ?? undefined,
           maxDuration: parseDuration(maxDurationStr) ?? undefined,
+          minFrequency: minFrequency / 100,
         }),
       });
 
@@ -344,6 +346,26 @@ export default function Home() {
                 onChange={e => setMaxDurationStr(e.target.value)}
                 className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 placeholder-gray-600"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">
+                CD frequency <span className="text-gray-600">({minFrequency}% of logs)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600">10%</span>
+                <input
+                  type="range"
+                  min={10}
+                  max={70}
+                  step={5}
+                  value={minFrequency}
+                  onChange={e => setMinFrequency(Number(e.target.value))}
+                  className="w-28 accent-blue-500"
+                />
+                <span className="text-xs text-gray-600">70%</span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">Lower = more abilities shown</p>
             </div>
 
             <button

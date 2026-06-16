@@ -21,8 +21,9 @@ interface GenerateRequest {
   difficulty: number; // 5 = Mythic, 4 = Heroic, 3 = Normal
   healerRoster: HealerRosterEntry[];
   logCount: number;
-  minDuration?: number; // seconds, optional
-  maxDuration?: number; // seconds, optional
+  minDuration?: number;
+  maxDuration?: number;
+  minFrequency?: number; // 0-1, default 0.3
 }
 
 // ── GraphQL queries ──────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { encounterID, encounterName, difficulty, healerRoster, logCount, minDuration, maxDuration } = body;
+  const { encounterID, encounterName, difficulty, healerRoster, logCount, minDuration, maxDuration, minFrequency = 0.3 } = body;
 
   if (!encounterID || !healerRoster?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -398,7 +399,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 3: Aggregate and build note ─────────────────────────────────────
-  const aggregated = aggregateCasts(castsBySpec, processedLogs, 0.3, 20);
+  const aggregated = aggregateCasts(castsBySpec, processedLogs, minFrequency, 20);
 
   // Map spec -> player name from roster
   const specToPlayer = new Map(healerRoster.map(r => [r.spec, r.playerName]));
