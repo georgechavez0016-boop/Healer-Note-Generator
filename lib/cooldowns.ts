@@ -96,6 +96,56 @@ for (const [spec, spells] of Object.entries(MAJOR_COOLDOWNS)) {
   }
 }
 
+// Cooldown durations in seconds — used to prevent the same spell appearing
+// more times in the note than the CD physically allows.
+export const SPELL_COOLDOWNS: Record<number, number> = {
+  // Restoration Druid
+  740:    180, // Tranquility
+  33891:  180, // Incarnation: Tree of Life
+  391528: 120, // Convoke the Spirits
+  197721:  60, // Flourish
+  // Mistweaver Monk
+  115310: 180, // Revival
+  322118: 180, // Invoke Yu'lon
+  325197: 180, // Invoke Chi-Ji
+  443028:  60, // Celestial Conduit
+  388615: 180, // Restoral
+  // Preservation Evoker
+  359816: 120, // Dream Flight
+  363534: 240, // Rewind
+  370537: 120, // Stasis
+  370960: 120, // Emerald Communion
+  406732:  60, // Spatial Paradox
+  374227: 120, // Zephyr / Breath of Eons
+  // Restoration Shaman
+  98008:  180, // Spirit Link Totem
+  114052: 180, // Healing Tide Totem
+  207399: 300, // Ancestral Protection Totem
+  108281: 120, // Ancestral Guidance
+  320674:  60, // Chain Harvest
+  374968:  45, // Primordial Wave
+  16191:  180, // Mana Tide Totem
+  // Holy Priest
+  64843:  180, // Divine Hymn
+  64901:   60, // Symbol of Hope
+  265202: 600, // Holy Word: Salvation
+  200183: 120, // Apotheosis
+  47788:  180, // Guardian Spirit
+  // Discipline Priest
+  62618:  180, // Power Word: Barrier
+  47536:   90, // Rapture
+  246287:  90, // Evangelism
+  271466: 180, // Luminous Barrier
+  324724:  60, // Unholy Nova
+  // Holy Paladin
+  31821:  180, // Aura Mastery
+  200652:  90, // Tyr's Deliverance
+  375576:  60, // Divine Toll
+  105809: 180, // Holy Avenger
+  200025: 180, // Beacon of Virtue
+  414127:  60, // Barrier of Faith
+};
+
 // Wowhead icon slugs for all tracked healer CDs — used as fallback when WCL doesn't return icon data
 export const SPELL_ICONS: Record<number, string> = {
   // Restoration Druid

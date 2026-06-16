@@ -5,6 +5,7 @@ import {
   WCL_SPEC_MAP,
   ALL_COOLDOWN_IDS,
   SPELL_TO_SPEC,
+  SPELL_COOLDOWNS,
 } from '@/lib/cooldowns';
 import {
   aggregateCasts,
@@ -402,10 +403,46 @@ export async function POST(req: NextRequest) {
   // Map spec -> player name from roster
   const specToPlayer = new Map(healerRoster.map(r => [r.spec, r.playerName]));
 
-  const entries: CooldownEntry[] = aggregated.map(e => ({
+  const entriesRaw: CooldownEntry[] = aggregated.map(e => ({
     ...e,
     playerName: specToPlayer.get(e.spec as HealerSpec) ?? e.spec,
   }));
+
+  // Remove entries that violate spell cooldown durations.
+  // Convert phase-relative times to approximate absolute seconds using phaseDurations
+  // so we can compare across phase boundaries.
+  const rawPhaseDurations: Record<number, number> = {};
+  for (const e of entriesRaw) {
+    rawPhaseDurations[e.phase] = Math.max(rawPhaseDurations[e.phase] ?? 0, e.time + 20);
+  }
+  const sortedPhases = Object.keys(rawPhaseDurations).map(Number).sort((a, b) => a - b);
+  function toAbsolute(phase: number, t: number): number {
+    let abs = 0;
+    for (const ph of sortedPhases) {
+      if (ph < phase) abs += rawPhaseDurations[ph];
+      else break;
+    }
+    return abs + t;
+  }
+
+  // Group by (spec, spellId), sort by absolute time, drop entries too close to the previous use
+  const cdGroups = new Map<string, CooldownEntry[]>();
+  for (const e of entriesRaw) {
+    const key = `${e.spec}:${e.spellId}`;
+    if (!cdGroups.has(key)) cdGroups.set(key, []);
+    cdGroups.get(key)!.push(e);
+  }
+  const entries: CooldownEntry[] = [];
+  for (const group of cdGroups.values()) {
+    const cd = SPELL_COOLDOWNS[group[0].spellId];
+    if (!cd) { entries.push(...group); continue; }
+    const sorted = [...group].sort((a, b) => toAbsolute(a.phase, a.time) - toAbsolute(b.phase, b.time));
+    let lastAbs = -Infinity;
+    for (const e of sorted) {
+      const abs = toAbsolute(e.phase, e.time);
+      if (abs - lastAbs >= cd) { entries.push(e); lastAbs = abs; }
+    }
+  }
 
   const diffLabel = DIFFICULTY_LABELS[difficulty] ?? `Difficulty${difficulty}`;
   const note = buildMrtNote(encounterID, encounterName, diffLabel, entries);
