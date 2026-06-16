@@ -34,29 +34,19 @@ const SPEC_ICONS: Record<string, string> = {
 };
 
 function SpellIcon({ spellId, spellIconMap, size = 32 }: { spellId: number; spellIconMap: Record<number, SpellInfo>; size?: number }) {
-  const [attempt, setAttempt] = useState(0);
-
-  const iconSlug = spellIconMap[spellId]?.icon ?? SPELL_ICONS[spellId];
+  const [failed, setFailed] = useState(false);
   const spellName = spellIconMap[spellId]?.name ?? SPELL_NAMES[spellId];
-
-  // Try sources in order: WCL CDN by ID → Wowhead by slug → fallback div
-  const urls = [
-    `https://assets.rpglogs.com/img/warcraft/abilities/${spellId}.jpg`,
-    iconSlug ? `https://wow.zamimg.com/images/wow/icons/medium/${iconSlug}.jpg` : null,
-  ].filter((u): u is string => u !== null);
-
-  const currentUrl = attempt < urls.length ? urls[attempt] : null;
 
   return (
     <div style={{ width: size, height: size, borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
-      {currentUrl ? (
+      {!failed ? (
         <img
-          src={currentUrl}
+          src={`/api/icon?id=${spellId}`}
           width={size}
           height={size}
           alt={spellName ?? String(spellId)}
           style={{ objectFit: 'cover', display: 'block' }}
-          onError={() => setAttempt(prev => prev + 1)}
+          onError={() => setFailed(true)}
         />
       ) : (
         <div style={{ width: size, height: size, background: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size < 24 ? 7 : 9, color: '#9ca3af', fontFamily: 'sans-serif', textAlign: 'center', padding: 2, lineHeight: 1.1 }}>
