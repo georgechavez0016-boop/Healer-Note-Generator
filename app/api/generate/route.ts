@@ -24,6 +24,7 @@ interface GenerateRequest {
   minDuration?: number;
   maxDuration?: number;
   minFrequency?: number; // 0-1, default 0.3
+  minSpecMatches?: number; // how many of the required specs must be present, default = all
 }
 
 // ── GraphQL queries ──────────────────────────────────────────────────────────
@@ -170,26 +171,24 @@ function requiredSpecsFromRoster(roster: HealerRosterEntry[]): HealerSpec[] {
 
 function compositionMatchesRequiredSpecs(
   composition: RankingEntry['composition'],
-  required: HealerSpec[]
+  required: HealerSpec[],
+  minMatches: number
 ): boolean {
   if (!composition?.length) return true; // no composition data → include optimistically
 
   const found = new Set<HealerSpec>();
 
   for (const player of composition) {
-    // WCL composition spec field can come as player.spec (string) or player.specs[].spec
     const specName =
       player.spec ??
       (player.specs && player.specs.length > 0 ? player.specs[0].spec : undefined);
-
     if (!specName) continue;
-
     const key = `${player.type}-${specName}`;
     const mapped = WCL_SPEC_MAP[key];
-    if (mapped) found.add(mapped);
+    if (mapped && required.includes(mapped)) found.add(mapped);
   }
 
-  return required.every(spec => found.has(spec));
+  return found.size >= minMatches;
 }
 
 function buildPhaseMap(fight: Fight): Array<{ id: number; startMs: number }> {
@@ -225,7 +224,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { encounterID, encounterName, difficulty, healerRoster, logCount, minDuration, maxDuration, minFrequency = 0.3 } = body;
+  const { encounterID, encounterName, difficulty, healerRoster, logCount, minDuration, maxDuration, minFrequency = 0.3, minSpecMatches } = body;
+  const requiredSpecCount = minSpecMatches ?? healerRoster.length;
 
   if (!encounterID || !healerRoster?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
         if (maxDuration !== undefined && durationSec > maxDuration) continue;
       }
 
-      if (compositionMatchesRequiredSpecs(ranking.composition, requiredSpecs)) {
+      if (compositionMatchesRequiredSpecs(ranking.composition, requiredSpecs, requiredSpecCount)) {
         matchingLogs.push({
           code: ranking.report.code,
           fightID: ranking.report.fightID,

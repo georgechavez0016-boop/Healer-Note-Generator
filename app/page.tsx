@@ -78,6 +78,7 @@ export default function Home() {
   const [minDurationStr, setMinDurationStr] = useState('');
   const [maxDurationStr, setMaxDurationStr] = useState('');
   const [minFrequency, setMinFrequency] = useState(30);
+  const [minSpecMatches, setMinSpecMatches] = useState<number | null>(null); // null = all
   const [showLogs, setShowLogs] = useState(false);
 
   const [generating, setGenerating] = useState(false);
@@ -137,6 +138,7 @@ export default function Home() {
           minDuration: parseDuration(minDurationStr) ?? undefined,
           maxDuration: parseDuration(maxDurationStr) ?? undefined,
           minFrequency: minFrequency / 100,
+          minSpecMatches: minSpecMatches ?? undefined,
         }),
       });
 
@@ -298,6 +300,27 @@ export default function Home() {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* Comp matching */}
+          <div className="mt-3 flex items-center gap-3">
+            <label className="text-xs text-gray-400 shrink-0">Composition match:</label>
+            <select
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+              value={minSpecMatches ?? roster.length}
+              onChange={e => {
+                const val = Number(e.target.value);
+                setMinSpecMatches(val === roster.length ? null : val);
+              }}
+            >
+              <option value={roster.length}>All {roster.length} specs must match</option>
+              {Array.from({ length: roster.length - 1 }, (_, i) => roster.length - 1 - i).map(n => (
+                <option key={n} value={n}>At least {n} of {roster.length} specs</option>
+              ))}
+            </select>
+            {minSpecMatches !== null && minSpecMatches < roster.length && (
+              <span className="text-xs text-yellow-500">More logs found, less precise comp</span>
+            )}
           </div>
         </section>
 
