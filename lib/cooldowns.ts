@@ -50,6 +50,7 @@ export const MAJOR_COOLDOWNS: Record<HealerSpec, number[]> = {
     370960, // Emerald Communion
     406732, // Spatial Paradox (TWW)
     374227, // Zephyr
+    374968, // Time Spiral (TWW talent)
   ],
   RestorationShaman: [
     98008,  // Spirit Link Totem
@@ -57,7 +58,6 @@ export const MAJOR_COOLDOWNS: Record<HealerSpec, number[]> = {
     207399, // Ancestral Protection Totem
     108281, // Ancestral Guidance
     320674, // Chain Harvest
-    374968, // Primordial Wave (TWW)
   ],
   HolyPriest: [
     64843,  // Divine Hymn
@@ -123,7 +123,7 @@ export const SPELL_COOLDOWNS: Record<number, number> = {
   207399: 300, // Ancestral Protection Totem
   108281: 120, // Ancestral Guidance
   320674:  60, // Chain Harvest
-  374968:  45, // Primordial Wave
+  374968: 120, // Time Spiral
   16191:  180, // Mana Tide Totem
   // Holy Priest
   64843:  180, // Divine Hymn
@@ -172,7 +172,7 @@ export const SPELL_ICONS: Record<number, string> = {
   207399: 'spell_nature_reincarnation',
   108281: 'ability_shaman_ancestralguidance',
   320674: 'ability_venthyr_chainharvestgeneric',
-  374968: 'ability_shaman_primordialwave',
+  374968: 'ability_evoker_timespiral',
   16191:  'spell_nature_manaregentotem',
   // Holy Priest
   64843:  'spell_holy_divinehymn',
@@ -219,7 +219,7 @@ export const SPELL_NAMES: Record<number, string> = {
   207399: 'Ancestral Protection Totem',
   108281: 'Ancestral Guidance',
   320674: 'Chain Harvest',
-  374968: 'Primordial Wave',
+  374968: 'Time Spiral',
   // Holy Priest
   64843:  'Divine Hymn',
   64901:  'Symbol of Hope',
