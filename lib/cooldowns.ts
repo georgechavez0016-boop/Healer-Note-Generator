@@ -96,6 +96,54 @@ for (const [spec, spells] of Object.entries(MAJOR_COOLDOWNS)) {
   }
 }
 
+// Wowhead icon slugs for all tracked healer CDs — used as fallback when WCL doesn't return icon data
+export const SPELL_ICONS: Record<number, string> = {
+  // Restoration Druid
+  740:    'spell_nature_tranquility',
+  33891:  'ability_druid_treeoflife',
+  391528: 'ability_druid_convokespirits',
+  197721: 'ability_druid_flourish',
+  // Mistweaver Monk
+  115310: 'spell_monk_revival',
+  322118: 'ability_monk_invokelutenstatue',
+  325197: 'ability_monk_invoketigerstatue',
+  443028: 'ability_monk_celestialconduit',
+  388615: 'ability_monk_restoral',
+  // Preservation Evoker
+  359816: 'ability_evoker_dreamflight',
+  363534: 'ability_evoker_rewind',
+  370537: 'ability_evoker_stasis',
+  370960: 'ability_evoker_emeraldcommunion',
+  406732: 'ability_evoker_spatialparadox',
+  374227: 'ability_evoker_breathofeons',
+  // Restoration Shaman
+  98008:  'spell_shaman_spiritlink',
+  114052: 'ability_shaman_healingtide',
+  207399: 'spell_nature_reincarnation',
+  108281: 'ability_shaman_ancestralguidance',
+  320674: 'ability_venthyr_chainharvestgeneric',
+  374968: 'ability_shaman_primordialwave',
+  16191:  'spell_nature_manaregentotem',
+  // Holy Priest
+  64843:  'spell_holy_divinehymn',
+  64901:  'spell_holy_symbolofhope',
+  265202: 'ability_priest_holywordsalvation',
+  200183: 'ability_priest_apotheosis',
+  47788:  'spell_holy_guardianspirit',
+  // Discipline Priest
+  62618:  'spell_holy_powerwordbarrier',
+  47536:  'spell_holy_rapture',
+  246287: 'ability_priest_evangelism',
+  271466: 'ability_priest_luminousbarrier',
+  // Holy Paladin
+  31821:  'spell_holy_auramastery',
+  200652: 'ability_paladin_tyrsdeliverance',
+  375576: 'ability_paladin_divinetoll',
+  105809: 'ability_paladin_holyavenger',
+  200025: 'ability_paladin_beaconofvirtue',
+  414127: 'ability_paladin_barrieroffaith',
+};
+
 export const SPELL_NAMES: Record<number, string> = {
   // Restoration Druid
   740:    'Tranquility',

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { EditableEntry, BossAbility, SpellInfo } from '@/types';
-import { SPEC_LABELS } from '@/lib/cooldowns';
+import { SPEC_LABELS, SPELL_ICONS, SPELL_NAMES } from '@/lib/cooldowns';
 import type { HealerSpec } from '@/lib/cooldowns';
 
 interface TimelineProps {
@@ -34,25 +34,33 @@ const SPEC_ICONS: Record<string, string> = {
 };
 
 function SpellIcon({ spellId, spellIconMap, size = 32 }: { spellId: number; spellIconMap: Record<number, SpellInfo>; size?: number }) {
-  const [imgError, setImgError] = useState(false);
-  const info = spellIconMap[spellId];
-  const iconUrl = info?.icon && !imgError
-    ? `https://wow.zamimg.com/images/wow/icons/medium/${info.icon}.jpg`
-    : null;
+  const [attempt, setAttempt] = useState(0);
+
+  const iconSlug = spellIconMap[spellId]?.icon ?? SPELL_ICONS[spellId];
+  const spellName = spellIconMap[spellId]?.name ?? SPELL_NAMES[spellId];
+
+  // Try sources in order: WCL CDN by ID → Wowhead by slug → fallback div
+  const urls = [
+    `https://assets.rpglogs.com/img/warcraft/abilities/${spellId}.jpg`,
+    iconSlug ? `https://wow.zamimg.com/images/wow/icons/medium/${iconSlug}.jpg` : null,
+  ].filter((u): u is string => u !== null);
+
+  const currentUrl = attempt < urls.length ? urls[attempt] : null;
+
   return (
     <div style={{ width: size, height: size, borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
-      {iconUrl ? (
+      {currentUrl ? (
         <img
-          src={iconUrl}
+          src={currentUrl}
           width={size}
           height={size}
-          alt={info?.name ?? String(spellId)}
+          alt={spellName ?? String(spellId)}
           style={{ objectFit: 'cover', display: 'block' }}
-          onError={() => setImgError(true)}
+          onError={() => setAttempt(prev => prev + 1)}
         />
       ) : (
-        <div style={{ width: size, height: size, background: '#4b5563', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#9ca3af', fontFamily: 'monospace' }}>
-          {spellId % 1000}
+        <div style={{ width: size, height: size, background: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size < 24 ? 7 : 9, color: '#9ca3af', fontFamily: 'sans-serif', textAlign: 'center', padding: 2, lineHeight: 1.1 }}>
+          {spellName?.split(' ').map(w => w[0]).join('').slice(0, 3) ?? '?'}
         </div>
       )}
     </div>
@@ -168,13 +176,12 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                   {ticks.map(t => (
                     <div key={t} style={{ position: 'absolute', left: `${(t / duration) * 100}%`, top: 0, bottom: 0, width: 1, background: '#1f2937' }} />
                   ))}
-                  {phaseBossAbilities.map(ability => {
-                    const hidden = hiddenBossSpells.has(ability.spellId);
+                  {phaseBossAbilities.filter(a => !hiddenBossSpells.has(a.spellId)).map(ability => {
                     const info = spellIconMap[ability.spellId];
                     return (
                       <div
                         key={`${ability.spellId}-${ability.time}`}
-                        title={`${info?.name ?? `Spell ${ability.spellId}`} — ${Math.round(ability.frequency * 100)}% of logs — ${formatSeconds(ability.time)}\nClick to toggle`}
+                        title={`${info?.name ?? SPELL_NAMES[ability.spellId] ?? `Spell ${ability.spellId}`} — ${Math.round(ability.frequency * 100)}% of logs — ${formatSeconds(ability.time)}\nClick to hide`}
                         onClick={() => toggleBossSpell(ability.spellId)}
                         style={{
                           position: 'absolute',
@@ -182,8 +189,6 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                           top: '50%',
                           transform: 'translate(-50%, -50%)',
                           cursor: 'pointer',
-                          opacity: hidden ? 0.25 : 1,
-                          transition: 'opacity 0.15s',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -193,7 +198,7 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                         <div style={{ border: '2px solid #ef4444', borderRadius: 5, overflow: 'hidden' }}>
                           <SpellIcon spellId={ability.spellId} spellIconMap={spellIconMap} size={BOSS_ICON_SIZE} />
                         </div>
-                        <span style={{ fontSize: 8, color: hidden ? '#4b5563' : '#f87171', whiteSpace: 'nowrap', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ fontSize: 8, color: '#f87171', whiteSpace: 'nowrap', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {formatSeconds(ability.time)}
                         </span>
                       </div>
@@ -280,18 +285,18 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
               <button
                 key={ability.spellId}
                 onClick={() => toggleBossSpell(ability.spellId)}
-                title={`${info?.name ?? ability.spellId} — toggle visibility`}
+                title={hidden ? 'Click to show on timeline' : 'Click to hide from timeline'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 4,
-                  background: hidden ? '#1f2937' : '#374151',
+                  background: '#1f2937',
                   border: `1px solid ${hidden ? '#374151' : '#ef4444'}`,
                   borderRadius: 4, padding: '2px 6px', cursor: 'pointer',
-                  opacity: hidden ? 0.4 : 1, transition: 'all 0.15s',
+                  opacity: hidden ? 0.35 : 1, transition: 'all 0.15s',
                 }}
               >
                 <SpellIcon spellId={ability.spellId} spellIconMap={spellIconMap} size={16} />
-                <span style={{ fontSize: 10, color: '#e5e7eb', whiteSpace: 'nowrap' }}>
-                  {info?.name ?? `Spell ${ability.spellId}`}
+                <span style={{ fontSize: 10, color: hidden ? '#6b7280' : '#e5e7eb', whiteSpace: 'nowrap', textDecoration: hidden ? 'line-through' : 'none' }}>
+                  {info?.name ?? SPELL_NAMES[ability.spellId] ?? `Spell ${ability.spellId}`}
                 </span>
               </button>
             );
