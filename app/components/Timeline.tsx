@@ -63,6 +63,21 @@ function formatSeconds(s: number): string {
   return m > 0 ? `${m}:${sec.toString().padStart(2, '0')}` : `${s}s`;
 }
 
+// Assign vertical lanes so icons don't overlap horizontally.
+// Two icons share a lane only if they're at least MIN_GAP_SEC apart.
+const MIN_GAP_SEC = 30;
+
+function assignLanes<T extends { time: number }>(items: T[]): Array<{ item: T; lane: number }> {
+  const sorted = [...items].sort((a, b) => a.time - b.time);
+  const laneLastTime: number[] = [];
+  return sorted.map(item => {
+    let lane = laneLastTime.findIndex(t => item.time - t >= MIN_GAP_SEC);
+    if (lane === -1) lane = laneLastTime.length;
+    laneLastTime[lane] = item.time;
+    return { item, lane };
+  });
+}
+
 export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap, onEntriesChange }: TimelineProps) {
   const phases = Object.keys(phaseDurations).map(Number).sort((a, b) => a - b);
   const [hiddenBossSpells, setHiddenBossSpells] = useState<Set<number>>(new Set());
@@ -111,10 +126,10 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
   }
 
   const LABEL_W = 130;
-  const ROW_H = 56;
-  const BOSS_ROW_H = 50;
   const ICON_SIZE = 32;
   const BOSS_ICON_SIZE = 28;
+  const SLOT_H = ICON_SIZE + 18; // icon + time label below
+  const ROW_PAD = 8; // top/bottom padding inside each row
 
   return (
     <div style={{ width: '100%' }}>
@@ -156,47 +171,41 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
             </div>
 
             {/* Boss row */}
-            {phaseBossAbilities.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #374151', background: 'rgba(127,29,29,0.15)', minHeight: BOSS_ROW_H }}>
-                <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#f87171', letterSpacing: 1, textTransform: 'uppercase' }}>Boss</span>
-                </div>
-                <div style={{ flex: 1, position: 'relative', height: BOSS_ROW_H }}>
-                  {/* tick lines */}
-                  {ticks.map(t => (
-                    <div key={t} style={{ position: 'absolute', left: `${(t / duration) * 100}%`, top: 0, bottom: 0, width: 1, background: '#1f2937' }} />
-                  ))}
-                  {phaseBossAbilities.filter(a => !hiddenBossSpells.has(a.spellId)).map(ability => {
-                    const info = spellIconMap[ability.spellId];
-                    return (
-                      <div
-                        key={`${ability.spellId}-${ability.time}`}
-                        title={`${info?.name ?? SPELL_NAMES[ability.spellId] ?? `Spell ${ability.spellId}`} — ${Math.round(ability.frequency * 100)}% of logs — ${formatSeconds(ability.time)}\nClick to hide`}
-                        onClick={() => toggleBossSpell(ability.spellId)}
-                        style={{
-                          position: 'absolute',
-                          left: `${(ability.time / duration) * 100}%`,
-                          top: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: 2,
-                        }}
-                      >
-                        <div style={{ border: '2px solid #ef4444', borderRadius: 5, overflow: 'hidden' }}>
-                          <SpellIcon spellId={ability.spellId} spellIconMap={spellIconMap} size={BOSS_ICON_SIZE} />
+            {phaseBossAbilities.length > 0 && (() => {
+              const visibleBoss = phaseBossAbilities.filter(a => !hiddenBossSpells.has(a.spellId));
+              const bossAssigned = assignLanes(visibleBoss.map(a => ({ ...a, time: a.time })));
+              const bossMaxLane = bossAssigned.reduce((m, a) => Math.max(m, a.lane), 0);
+              const bossRowH = (bossMaxLane + 1) * (BOSS_ICON_SIZE + 14) + ROW_PAD * 2;
+              return (
+                <div style={{ display: 'flex', borderBottom: '1px solid #374151', background: 'rgba(127,29,29,0.15)' }}>
+                  <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#f87171', letterSpacing: 1, textTransform: 'uppercase' }}>Boss</span>
+                  </div>
+                  <div style={{ flex: 1, position: 'relative', height: bossRowH }}>
+                    {ticks.map(t => (
+                      <div key={t} style={{ position: 'absolute', left: `${(t / duration) * 100}%`, top: 0, bottom: 0, width: 1, background: '#1f2937' }} />
+                    ))}
+                    {bossAssigned.map(({ item: ability, lane }) => {
+                      const info = spellIconMap[ability.spellId];
+                      const topPx = ROW_PAD + lane * (BOSS_ICON_SIZE + 14);
+                      return (
+                        <div
+                          key={`${ability.spellId}-${ability.time}`}
+                          title={`${info?.name ?? SPELL_NAMES[ability.spellId] ?? `Spell ${ability.spellId}`} — ${Math.round(ability.frequency * 100)}% of logs — ${formatSeconds(ability.time)}\nClick to hide`}
+                          onClick={() => toggleBossSpell(ability.spellId)}
+                          style={{ position: 'absolute', left: `${(ability.time / duration) * 100}%`, top: topPx, transform: 'translateX(-50%)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
+                        >
+                          <div style={{ border: '2px solid #ef4444', borderRadius: 5, overflow: 'hidden' }}>
+                            <SpellIcon spellId={ability.spellId} spellIconMap={spellIconMap} size={BOSS_ICON_SIZE} />
+                          </div>
+                          <span style={{ fontSize: 8, color: '#f87171', whiteSpace: 'nowrap' }}>{formatSeconds(ability.time)}</span>
                         </div>
-                        <span style={{ fontSize: 8, color: '#f87171', whiteSpace: 'nowrap', maxWidth: 50, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {formatSeconds(ability.time)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Healer rows */}
             {players.map(player => {
@@ -204,15 +213,18 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
               if (playerEntries.length === 0) return null;
               const rowKey = `${phase}-${player.name}`;
               const specColor = SPEC_COLORS[player.spec] ?? '#9ca3af';
+              const assigned = assignLanes(playerEntries);
+              const maxLane = assigned.reduce((m, a) => Math.max(m, a.lane), 0);
+              const rowH = (maxLane + 1) * SLOT_H + ROW_PAD * 2;
               return (
                 <div
                   key={rowKey}
-                  style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1f2937', minHeight: ROW_H }}
+                  style={{ display: 'flex', borderBottom: '1px solid #1f2937' }}
                   onPointerMove={e => handleTimelinePointerMove(e, phase, player.name)}
                   onPointerUp={handlePointerUp}
                 >
                   {/* Label */}
-                  <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 12px' }}>
+                  <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 12px', display: 'flex', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span style={{ fontSize: 14 }}>{SPEC_ICONS[player.spec] ?? '💊'}</span>
                       <div>
@@ -225,37 +237,39 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                   {/* Timeline area */}
                   <div
                     ref={el => { if (el) timelineAreaRefs.current.set(rowKey, el); }}
-                    style={{ flex: 1, position: 'relative', height: ROW_H }}
+                    style={{ flex: 1, position: 'relative', height: rowH }}
                   >
-                    {/* tick lines */}
                     {ticks.map(t => (
                       <div key={t} style={{ position: 'absolute', left: `${(t / duration) * 100}%`, top: 0, bottom: 0, width: 1, background: '#1f2937' }} />
                     ))}
-                    {playerEntries.map(entry => (
-                      <div
-                        key={entry.id}
-                        title={`${spellIconMap[entry.spellId]?.name ?? `Spell ${entry.spellId}`}\n${formatSeconds(entry.time)} — ${Math.round(entry.frequency * 100)}% of logs\nDrag to adjust`}
-                        onPointerDown={e => handleIconPointerDown(e, entry, duration)}
-                        style={{
-                          position: 'absolute',
-                          left: `${(entry.time / duration) * 100}%`,
-                          top: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          cursor: 'grab',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: 2,
-                          userSelect: 'none',
-                          touchAction: 'none',
-                        }}
-                      >
-                        <div style={{ border: `2px solid ${specColor}`, borderRadius: 5, overflow: 'hidden' }}>
-                          <SpellIcon spellId={entry.spellId} spellIconMap={spellIconMap} size={ICON_SIZE} />
+                    {assigned.map(({ item: entry, lane }) => {
+                      const topPx = ROW_PAD + lane * SLOT_H;
+                      return (
+                        <div
+                          key={entry.id}
+                          title={`${spellIconMap[entry.spellId]?.name ?? SPELL_NAMES[entry.spellId] ?? `Spell ${entry.spellId}`}\n${formatSeconds(entry.time)} — ${Math.round(entry.frequency * 100)}% of logs\nDrag to adjust`}
+                          onPointerDown={e => handleIconPointerDown(e, entry, duration)}
+                          style={{
+                            position: 'absolute',
+                            left: `${(entry.time / duration) * 100}%`,
+                            top: topPx,
+                            transform: 'translateX(-50%)',
+                            cursor: 'grab',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 2,
+                            userSelect: 'none',
+                            touchAction: 'none',
+                          }}
+                        >
+                          <div style={{ border: `2px solid ${specColor}`, borderRadius: 5, overflow: 'hidden' }}>
+                            <SpellIcon spellId={entry.spellId} spellIconMap={spellIconMap} size={ICON_SIZE} />
+                          </div>
+                          <span style={{ fontSize: 8, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatSeconds(entry.time)}</span>
                         </div>
-                        <span style={{ fontSize: 8, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatSeconds(entry.time)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
