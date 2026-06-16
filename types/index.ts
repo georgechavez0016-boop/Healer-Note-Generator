@@ -5,6 +5,28 @@ export interface HealerRosterEntry {
   playerName: string;
 }
 
+export interface SpellInfo {
+  name: string;
+  icon: string; // WoW icon slug e.g. "spell_holy_divinehymn"
+}
+
+export interface BossAbility {
+  spellId: number;
+  phase: number;
+  time: number;
+  frequency: number;
+}
+
+export interface EditableEntry {
+  id: string;
+  phase: number;
+  time: number;
+  spec: string;
+  spellId: number;
+  playerName: string;
+  frequency: number;
+}
+
 // MM:SS string → total seconds, returns null if blank/invalid
 export function parseDuration(mmss: string): number | null {
   const trimmed = mmss.trim();
@@ -46,6 +68,10 @@ export interface GenerateResponse {
   entriesGenerated?: number;
   logsUsed?: UsedLog[];
   error?: string;
+  entries?: EditableEntry[];
+  bossAbilities?: BossAbility[];
+  phaseDurations?: Record<number, number>;
+  spellIconMap?: Record<number, SpellInfo>;
 }
 
 export interface Zone {

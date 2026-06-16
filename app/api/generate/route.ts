@@ -12,7 +12,7 @@ import {
   RawCast,
   CooldownEntry,
 } from '@/lib/note-generator';
-import { HealerRosterEntry } from '@/types';
+import { HealerRosterEntry, EditableEntry, SpellInfo, BossAbility } from '@/types';
 
 interface GenerateRequest {
   encounterID: number;
@@ -38,9 +38,16 @@ const RANKINGS_QUERY = `
 `;
 
 const REPORT_QUERY = `
-  query Report($code: String!, $fightID: Int!, $filter: String!) {
+  query Report($code: String!, $fightID: Int!, $healerFilter: String!) {
     reportData {
       report(code: $code) {
+        masterData(translate: true) {
+          abilities {
+            gameID
+            name
+            icon
+          }
+        }
         fights(fightIDs: [$fightID]) {
           id
           startTime
@@ -50,12 +57,22 @@ const REPORT_QUERY = `
             startTime
           }
         }
-        events(
+        healerEvents: events(
           startTime: 0
           endTime: 99999999
           dataType: Casts
           fightIDs: [$fightID]
-          filterExpression: $filter
+          filterExpression: $healerFilter
+        ) {
+          data
+          nextPageTimestamp
+        }
+        bossEvents: events(
+          startTime: 0
+          endTime: 99999999
+          dataType: Casts
+          fightIDs: [$fightID]
+          hostilityType: Enemies
         ) {
           data
           nextPageTimestamp
@@ -66,15 +83,15 @@ const REPORT_QUERY = `
 `;
 
 const MORE_EVENTS_QUERY = `
-  query MoreEvents($code: String!, $fightID: Int!, $filter: String!, $startTime: Float!) {
+  query MoreEvents($code: String!, $fightID: Int!, $healerFilter: String!, $startTime: Float!) {
     reportData {
       report(code: $code) {
-        events(
+        healerEvents: events(
           startTime: $startTime
           endTime: 99999999
           dataType: Casts
           fightIDs: [$fightID]
-          filterExpression: $filter
+          filterExpression: $healerFilter
         ) {
           data
           nextPageTimestamp
@@ -123,11 +140,15 @@ interface CastEvent {
   abilityGameID: number;
 }
 
+interface AbilityInfo { gameID: number; name: string; icon: string; }
+
 interface ReportData {
   reportData: {
     report: {
+      masterData: { abilities: AbilityInfo[] };
       fights: Fight[];
-      events: { data: CastEvent[]; nextPageTimestamp: number | null };
+      healerEvents: { data: CastEvent[]; nextPageTimestamp: number | null };
+      bossEvents: { data: CastEvent[]; nextPageTimestamp: number | null };
     };
   };
 }
@@ -280,6 +301,9 @@ export async function POST(req: NextRequest) {
     requiredSpecs.map(spec => [spec, []])
   );
 
+  const bossCastsBySpell = new Map<string, Array<{ phase: number; time: number }>>();
+  const abilityInfoMap = new Map<number, { name: string; icon: string }>();
+
   let processedLogs = 0;
   const BATCH_SIZE = 5;
   const fetchErrors: string[] = [];
@@ -294,7 +318,7 @@ export async function POST(req: NextRequest) {
           const reportData = await wclQuery<ReportData>(REPORT_QUERY, {
             code,
             fightID,
-            filter: spellFilter,
+            healerFilter: spellFilter,
           });
 
           const report = reportData.reportData.report;
@@ -303,22 +327,22 @@ export async function POST(req: NextRequest) {
           const fight = report.fights[0];
           const phases = buildPhaseMap(fight);
 
-          // Collect all pages of events
-          let events: CastEvent[] = [...(report.events?.data ?? [])];
-          let nextPage = report.events?.nextPageTimestamp;
+          // Collect all pages of healer events
+          let events: CastEvent[] = [...(report.healerEvents?.data ?? [])];
+          let nextPage = report.healerEvents?.nextPageTimestamp;
 
           while (nextPage) {
             const more = await wclQuery<{
               reportData: {
-                report: { events: { data: CastEvent[]; nextPageTimestamp: number | null } };
+                report: { healerEvents: { data: CastEvent[]; nextPageTimestamp: number | null } };
               };
             }>(MORE_EVENTS_QUERY, {
               code,
               fightID,
-              filter: spellFilter,
+              healerFilter: spellFilter,
               startTime: nextPage,
             });
-            const moreEvents = more.reportData.report.events;
+            const moreEvents = more.reportData.report.healerEvents;
             events = events.concat(moreEvents.data ?? []);
             nextPage = moreEvents.nextPageTimestamp;
           }
@@ -336,6 +360,22 @@ export async function POST(req: NextRequest) {
             );
 
             castsBySpec.get(spec)?.push({ spellId, phase, timeInPhase });
+          }
+
+          // collect ability info from masterData
+          for (const ab of report.masterData?.abilities ?? []) {
+            if (!abilityInfoMap.has(ab.gameID)) {
+              abilityInfoMap.set(ab.gameID, { name: ab.name, icon: ab.icon });
+            }
+          }
+
+          // collect boss cast events
+          for (const event of report.bossEvents?.data ?? []) {
+            if (event.type !== 'cast') continue;
+            const { phase, timeInPhase } = getPhaseForTimestamp(event.timestamp, phases);
+            const key = String(event.abilityGameID);
+            if (!bossCastsBySpell.has(key)) bossCastsBySpell.set(key, []);
+            bossCastsBySpell.get(key)!.push({ phase, time: timeInPhase });
           }
 
           usedLogs.push({ code, fightID, duration });
@@ -377,11 +417,75 @@ export async function POST(req: NextRequest) {
     url: `https://www.warcraftlogs.com/reports/${code}#fight=${fightID}`,
   }));
 
+  // ── Step 4: Aggregate boss abilities ─────────────────────────────────────
+  const bossAbilities: BossAbility[] = [];
+  for (const [spellIdStr, casts] of bossCastsBySpell.entries()) {
+    const spellId = Number(spellIdStr);
+    const byPhase = new Map<number, number[]>();
+    for (const c of casts) {
+      if (!byPhase.has(c.phase)) byPhase.set(c.phase, []);
+      byPhase.get(c.phase)!.push(c.time);
+    }
+    for (const [phase, times] of byPhase.entries()) {
+      times.sort((a, b) => a - b);
+      const clusters: number[][] = [];
+      for (const t of times) {
+        const last = clusters[clusters.length - 1];
+        if (last && Math.abs(t - last[last.length - 1]) <= 15) {
+          last.push(t);
+        } else {
+          clusters.push([t]);
+        }
+      }
+      for (const cluster of clusters) {
+        const frequency = cluster.length / processedLogs;
+        if (frequency < 0.6) continue;
+        const sorted = [...cluster].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const medianTime = sorted.length % 2 === 0
+          ? (sorted[mid - 1] + sorted[mid]) / 2
+          : sorted[mid];
+        bossAbilities.push({ spellId, phase, time: Math.round(medianTime), frequency });
+      }
+    }
+  }
+
+  // ── Step 5: Build editable entries, phaseDurations, spellIconMap ─────────
+  const editableEntries: EditableEntry[] = entries.map((e, i) => ({
+    id: `entry-${i}`,
+    phase: e.phase,
+    time: e.time,
+    spec: e.spec,
+    spellId: e.spellId,
+    playerName: e.playerName,
+    frequency: e.frequency,
+  }));
+
+  const phaseDurations: Record<number, number> = {};
+  for (const e of editableEntries) {
+    phaseDurations[e.phase] = Math.max(phaseDurations[e.phase] ?? 0, e.time + 20);
+  }
+  for (const b of bossAbilities) {
+    phaseDurations[b.phase] = Math.max(phaseDurations[b.phase] ?? 0, b.time + 20);
+  }
+  for (const ph of Object.keys(phaseDurations)) {
+    phaseDurations[Number(ph)] = Math.max(phaseDurations[Number(ph)], 60);
+  }
+
+  const spellIconMap: Record<number, SpellInfo> = {};
+  for (const [id, info] of abilityInfoMap.entries()) {
+    spellIconMap[id] = info;
+  }
+
   return NextResponse.json({
     note,
     processedLogs,
     matchingLogsFound: matchingLogs.length,
     entriesGenerated: entries.length,
     logsUsed,
+    entries: editableEntries,
+    bossAbilities,
+    phaseDurations,
+    spellIconMap,
   });
 }

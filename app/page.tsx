@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { HealerSpec, SPEC_LABELS } from '@/lib/cooldowns';
-import { HealerRosterEntry, GenerateResponse, Zone, UsedLog, parseDuration, formatDuration } from '@/types';
+import { HealerRosterEntry, GenerateResponse, Zone, UsedLog, parseDuration, formatDuration, EditableEntry, BossAbility, SpellInfo } from '@/types';
+import { Timeline } from '@/app/components/Timeline';
+import { buildMrtNote } from '@/lib/note-generator';
 
 const HEALER_SPECS: HealerSpec[] = [
   'RestorationDruid',
@@ -81,6 +83,12 @@ export default function Home() {
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [editableEntries, setEditableEntries] = useState<EditableEntry[]>([]);
+  const [bossAbilities, setBossAbilities] = useState<BossAbility[]>([]);
+  const [phaseDurations, setPhaseDurations] = useState<Record<number, number>>({});
+  const [spellIconMap, setSpellIconMap] = useState<Record<number, SpellInfo>>({});
+  const [encounterMeta, setEncounterMeta] = useState<{ id: number; name: string; difficulty: string } | null>(null);
+
   useEffect(() => {
     fetch('/api/zones')
       .then(r => r.json())
@@ -132,11 +140,27 @@ export default function Home() {
 
       const data: GenerateResponse = await res.json();
       setResult(data);
+      if (data.entries) setEditableEntries(data.entries);
+      if (data.bossAbilities) setBossAbilities(data.bossAbilities);
+      if (data.phaseDurations) setPhaseDurations(data.phaseDurations);
+      if (data.spellIconMap) setSpellIconMap(data.spellIconMap as Record<number, SpellInfo>);
+      setEncounterMeta({
+        id: selectedEncounterId,
+        name: selectedEncounter.name,
+        difficulty: DIFFICULTIES.find(d => d.value === selectedDifficulty)?.label ?? 'Mythic',
+      });
     } catch (err) {
       setResult({ error: String(err) });
     } finally {
       setGenerating(false);
     }
+  }
+
+  function handleEntriesChange(newEntries: EditableEntry[]) {
+    setEditableEntries(newEntries);
+    if (!encounterMeta) return;
+    const updatedNote = buildMrtNote(encounterMeta.id, encounterMeta.name, encounterMeta.difficulty, newEntries);
+    setResult(prev => prev ? { ...prev, note: updatedNote } : prev);
   }
 
   async function copyNote() {
@@ -383,6 +407,21 @@ export default function Home() {
                     {result.note.raw}
                   </pre>
                 </div>
+
+                {editableEntries.length > 0 && (
+                  <div className="mt-4 mb-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">
+                      Timeline — drag cooldowns to adjust
+                    </h3>
+                    <Timeline
+                      entries={editableEntries}
+                      bossAbilities={bossAbilities}
+                      phaseDurations={phaseDurations}
+                      spellIconMap={spellIconMap}
+                      onEntriesChange={handleEntriesChange}
+                    />
+                  </div>
+                )}
                 <p className="mt-3 text-xs text-gray-600">
                   Paste this into your MRT (Method Raid Tools) note in-game. Times are seconds since each phase starts.
                   Review and adjust timings before your pull — these are aggregated from top kill patterns.
