@@ -9,6 +9,9 @@ const HEALER_SPECS: HealerSpec[] = [
   'MistweaverMonk',
   'PreservationEvoker',
   'RestorationShaman',
+  'HolyPriest',
+  'DisciplinePriest',
+  'HolyPaladin',
 ];
 
 const DIFFICULTIES = [
@@ -18,17 +21,23 @@ const DIFFICULTIES = [
 ];
 
 const SPEC_COLORS: Record<HealerSpec, string> = {
-  RestorationDruid: 'text-green-400',
-  MistweaverMonk: 'text-teal-400',
-  PreservationEvoker: 'text-emerald-300',
+  RestorationDruid:  'text-green-400',
+  MistweaverMonk:    'text-teal-400',
+  PreservationEvoker:'text-emerald-300',
   RestorationShaman: 'text-blue-400',
+  HolyPriest:        'text-yellow-200',
+  DisciplinePriest:  'text-purple-400',
+  HolyPaladin:       'text-pink-300',
 };
 
 const SPEC_ICONS: Record<HealerSpec, string> = {
-  RestorationDruid: '🌿',
-  MistweaverMonk: '☯️',
-  PreservationEvoker: '🐉',
+  RestorationDruid:  '🌿',
+  MistweaverMonk:    '☯️',
+  PreservationEvoker:'🐉',
   RestorationShaman: '⚡',
+  HolyPriest:        '✨',
+  DisciplinePriest:  '🔮',
+  HolyPaladin:       '🛡️',
 };
 
 export default function Home() {
@@ -41,9 +50,28 @@ export default function Home() {
   const [selectedDifficulty, setSelectedDifficulty] = useState(5);
   const [logCount, setLogCount] = useState(30);
 
-  const [roster, setRoster] = useState<HealerRosterEntry[]>(
-    HEALER_SPECS.map(spec => ({ spec, playerName: '' }))
-  );
+  const [roster, setRoster] = useState<HealerRosterEntry[]>([
+    { spec: 'RestorationDruid', playerName: '' },
+    { spec: 'MistweaverMonk', playerName: '' },
+    { spec: 'PreservationEvoker', playerName: '' },
+    { spec: 'RestorationShaman', playerName: '' },
+  ]);
+
+  function addHealer() {
+    setRoster(prev => [...prev, { spec: 'RestorationDruid', playerName: '' }]);
+  }
+
+  function removeHealer(index: number) {
+    setRoster(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function updateSpec(index: number, spec: HealerSpec) {
+    setRoster(prev => prev.map((r, i) => i === index ? { ...r, spec } : r));
+  }
+
+  function updatePlayerName(index: number, name: string) {
+    setRoster(prev => prev.map((r, i) => i === index ? { ...r, playerName: name } : r));
+  }
 
   const [minDurationStr, setMinDurationStr] = useState('');
   const [maxDurationStr, setMaxDurationStr] = useState('');
@@ -71,13 +99,13 @@ export default function Home() {
   const selectedZone = zones.find(z => z.id === selectedZoneId);
   const selectedEncounter = selectedZone?.encounters.find(e => e.id === selectedEncounterId);
 
-  function updatePlayerName(spec: HealerSpec, name: string) {
-    setRoster(prev => prev.map(r => r.spec === spec ? { ...r, playerName: name } : r));
-  }
-
   async function handleGenerate() {
     if (!selectedEncounterId || !selectedEncounter) return;
 
+    if (roster.length === 0) {
+      alert('Add at least one healer to the roster.');
+      return;
+    }
     const emptySlots = roster.filter(r => !r.playerName.trim());
     if (emptySlots.length > 0) {
       alert(`Please enter player names for: ${emptySlots.map(r => SPEC_LABELS[r.spec]).join(', ')}`);
@@ -195,28 +223,53 @@ export default function Home() {
 
         {/* Healer roster */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">
-            Your Healer Roster
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {roster.map(entry => (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Your Healer Roster
+            </h2>
+            <button
+              onClick={addHealer}
+              disabled={roster.length >= 6}
+              className="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 border border-gray-600 rounded text-gray-300 transition-colors"
+            >
+              + Add healer
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {roster.map((entry, index) => (
               <div
-                key={entry.spec}
-                className="flex items-center gap-3 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3"
+                key={index}
+                className="flex items-center gap-3 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5"
               >
-                <span className="text-xl">{SPEC_ICONS[entry.spec]}</span>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-xs font-medium mb-1 ${SPEC_COLORS[entry.spec]}`}>
-                    {SPEC_LABELS[entry.spec]}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Character name..."
-                    value={entry.playerName}
-                    onChange={e => updatePlayerName(entry.spec, e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                <span className="text-lg shrink-0">{SPEC_ICONS[entry.spec]}</span>
+
+                <select
+                  value={entry.spec}
+                  onChange={e => updateSpec(index, e.target.value as HealerSpec)}
+                  className={`bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs font-medium focus:outline-none focus:border-blue-500 ${SPEC_COLORS[entry.spec]}`}
+                >
+                  {HEALER_SPECS.map(spec => (
+                    <option key={spec} value={spec}>{SPEC_LABELS[spec]}</option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  placeholder="Character name..."
+                  value={entry.playerName}
+                  onChange={e => updatePlayerName(index, e.target.value)}
+                  className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+
+                <button
+                  onClick={() => removeHealer(index)}
+                  disabled={roster.length <= 1}
+                  className="shrink-0 text-gray-600 hover:text-red-400 disabled:opacity-20 transition-colors text-lg leading-none"
+                  title="Remove healer"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
