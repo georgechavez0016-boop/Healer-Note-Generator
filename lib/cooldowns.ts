@@ -151,47 +151,45 @@ export const SPELL_ICONS: Record<number, string> = {
   // Restoration Druid
   740:    'spell_nature_tranquility',
   33891:  'ability_druid_treeoflife',
-  391528: 'ability_druid_convokespirits',
+  391528: 'ability_ardenweald_druid',        // Convoke the Spirits
   197721: 'ability_druid_flourish',
   // Mistweaver Monk
   115310: 'spell_monk_revival',
-  322118: 'ability_monk_invokelutenstatue',
-  325197: 'ability_monk_invoketigerstatue',
-  443028: 'ability_monk_celestialconduit',
-  388615: 'ability_monk_restoral',
+  322118: 'monk_stance_wiseserpent',          // Invoke Yu'lon
+  325197: 'monk_stance_whitetiger',           // Invoke Chi-Ji
+  443028: 'ability_monk_thunderfocustea',     // Celestial Conduit
+  388615: 'ability_monk_uplift',              // Restoral
   // Preservation Evoker
   359816: 'ability_evoker_dreamflight',
   363534: 'ability_evoker_rewind',
   370537: 'ability_evoker_stasis',
-  370960: 'ability_evoker_emeraldcommunion',
+  370960: 'ability_evoker_dragonrage2',       // Emerald Communion
   406732: 'ability_evoker_spatialparadox',
-  374227: 'ability_evoker_breathofeons',
+  374227: 'ability_evoker_hover',             // Zephyr
+  374968: 'ability_evoker_timespiral',        // Time Spiral
   // Restoration Shaman
   98008:  'spell_shaman_spiritlink',
   114052: 'ability_shaman_healingtide',
   207399: 'spell_nature_reincarnation',
   108281: 'ability_shaman_ancestralguidance',
-  320674: 'ability_venthyr_chainharvestgeneric',
-  374968: 'ability_evoker_timespiral',
+  320674: 'ability_maldraxxus_druid',         // Chain Harvest
   16191:  'spell_nature_manaregentotem',
   // Holy Priest
   64843:  'spell_holy_divinehymn',
   64901:  'spell_holy_symbolofhope',
-  265202: 'ability_priest_holywordsalvation',
-  200183: 'ability_priest_apotheosis',
+  200183: 'ability_priest_ascension',         // Apotheosis
   47788:  'spell_holy_guardianspirit',
   // Discipline Priest
   62618:  'spell_holy_powerwordbarrier',
   47536:  'spell_holy_rapture',
   246287: 'ability_priest_evangelism',
-  271466: 'ability_priest_luminousbarrier',
+  271466: 'spell_holy_powerwordbarrier',      // Luminous Barrier (same visual as PW:Barrier)
   // Holy Paladin
   31821:  'spell_holy_auramastery',
-  200652: 'ability_paladin_tyrsdeliverance',
-  375576: 'ability_paladin_divinetoll',
+  200652: 'ability_paladin_lightofthemartyr', // Tyr's Deliverance
+  375576: 'spell_holy_divineshield',          // Divine Toll
   105809: 'ability_paladin_holyavenger',
-  200025: 'ability_paladin_beaconofvirtue',
-  414127: 'ability_paladin_barrieroffaith',
+  200025: 'ability_paladin_beaconoflight',    // Beacon of Virtue
 };
 
 export const SPELL_NAMES: Record<number, string> = {
