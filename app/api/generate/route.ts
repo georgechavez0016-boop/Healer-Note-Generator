@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
   const matchingLogs: Array<{ code: string; fightID: number; duration?: number }> = [];
   let page = 1;
   let hasMore = true;
-  const MAX_PAGES = 10;
+  const MAX_PAGES = 20;
 
   while (matchingLogs.length < logCount && hasMore && page <= MAX_PAGES) {
     type RankingsResponse = {

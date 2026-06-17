@@ -417,10 +417,10 @@ export default function Home() {
               <input
                 type="number"
                 min={5}
-                max={50}
+                max={100}
                 value={logCount}
                 onChange={e => setLogCount(Number(e.target.value))}
-                onBlur={e => setLogCount(Math.min(50, Math.max(5, Number(e.target.value) || 5)))}
+                onBlur={e => setLogCount(Math.min(100, Math.max(5, Number(e.target.value) || 5)))}
                 className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
