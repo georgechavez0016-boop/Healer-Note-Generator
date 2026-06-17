@@ -102,7 +102,7 @@ export const SPELL_COOLDOWNS: Record<number, number> = {
   // Restoration Druid
   740:    180, // Tranquility
   33891:  180, // Incarnation: Tree of Life
-  391528: 120, // Convoke the Spirits
+  391528:  60, // Convoke the Spirits (meta build takes 1min CD talent)
   197721:  60, // Flourish
   // Mistweaver Monk
   115310: 180, // Revival
