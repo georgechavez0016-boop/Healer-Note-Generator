@@ -108,7 +108,7 @@ export const SPELL_COOLDOWNS: Record<number, number> = {
   115310: 180, // Revival
   322118: 180, // Invoke Yu'lon
   325197: 180, // Invoke Chi-Ji
-  443028:  60, // Celestial Conduit
+  443028:  90, // Celestial Conduit
   388615: 180, // Restoral
   // Preservation Evoker
   359816: 120, // Dream Flight
