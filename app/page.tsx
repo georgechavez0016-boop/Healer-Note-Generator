@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { HealerSpec, SPEC_LABELS } from '@/lib/cooldowns';
+import { useEffect, useState, useMemo } from 'react';
+import { HealerSpec, SPEC_LABELS, SPELL_COOLDOWNS } from '@/lib/cooldowns';
 import { HealerRosterEntry, GenerateResponse, Zone, UsedLog, parseDuration, formatDuration, EditableEntry, BossAbility, SpellInfo } from '@/types';
 import { Timeline } from '@/app/components/Timeline';
 import { buildMrtNote } from '@/lib/note-generator';
@@ -165,6 +165,86 @@ export default function Home() {
     if (!encounterMeta) return;
     const updatedNote = buildMrtNote(encounterMeta.id, encounterMeta.name, encounterMeta.difficulty, newEntries);
     setResult(prev => prev ? { ...prev, note: updatedNote } : prev);
+  }
+
+  // Compute suggested CD uses: gaps where a CD is available but unused, snapped to boss mechanics
+  const suggestedEntries = useMemo<EditableEntry[]>(() => {
+    if (!editableEntries.length || !bossAbilities.length || !Object.keys(phaseDurations).length) return [];
+
+    const sortedPhases = Object.keys(phaseDurations).map(Number).sort((a, b) => a - b);
+    const totalDuration = sortedPhases.reduce((sum, ph) => sum + phaseDurations[ph], 0);
+
+    function toAbs(phase: number, time: number): number {
+      let abs = 0;
+      for (const ph of sortedPhases) {
+        if (ph < phase) abs += phaseDurations[ph];
+        else break;
+      }
+      return abs + time;
+    }
+
+    const sortedBoss = [...bossAbilities]
+      .map(b => ({ ...b, abs: toAbs(b.phase, b.time) }))
+      .sort((a, b) => a.abs - b.abs);
+
+    const groups = new Map<string, EditableEntry[]>();
+    for (const e of editableEntries) {
+      const key = `${e.playerName}:${e.spellId}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(e);
+    }
+
+    const suggestions: EditableEntry[] = [];
+
+    for (const [, group] of groups) {
+      const { spellId, playerName, spec } = group[0];
+      const cd = SPELL_COOLDOWNS[spellId];
+      if (!cd) continue;
+
+      const sorted = [...group].sort((a, b) => toAbs(a.phase, a.time) - toAbs(b.phase, b.time));
+      let availableAt = toAbs(sorted[0].phase, sorted[0].time) + cd;
+
+      for (let i = 1; i <= sorted.length; i++) {
+        const nextUseAbs = i < sorted.length ? toAbs(sorted[i].phase, sorted[i].time) : totalDuration;
+
+        // Fill the gap [availableAt, nextUseAbs) with boss-mechanic-aligned suggestions
+        while (availableAt < nextUseAbs - 5) {
+          const mech = sortedBoss.find(b => b.abs >= availableAt && b.abs < nextUseAbs - 5);
+          if (!mech) break;
+          // Avoid duplicating an already-existing entry at the same spot
+          const alreadyExists = editableEntries.some(
+            e => e.playerName === playerName && e.spellId === spellId && e.phase === mech.phase && Math.abs(e.time - mech.time) < 5
+          );
+          if (!alreadyExists) {
+            suggestions.push({
+              id: `suggest-${playerName}-${spellId}-${mech.phase}-${mech.time}`,
+              phase: mech.phase,
+              time: mech.time,
+              spec,
+              spellId,
+              playerName,
+              frequency: 0,
+            });
+          }
+          availableAt = mech.abs + cd;
+        }
+
+        if (i < sorted.length) {
+          availableAt = Math.max(availableAt, toAbs(sorted[i].phase, sorted[i].time) + cd);
+        }
+      }
+    }
+
+    return suggestions;
+  }, [editableEntries, bossAbilities, phaseDurations]);
+
+  function handleAcceptSuggestion(entry: EditableEntry) {
+    const accepted: EditableEntry = {
+      ...entry,
+      id: `accepted-${Date.now()}-${entry.spellId}`,
+      frequency: 0,
+    };
+    handleEntriesChange([...editableEntries, accepted]);
   }
 
   async function copyNote() {
@@ -464,6 +544,8 @@ export default function Home() {
                       phaseDurations={phaseDurations}
                       spellIconMap={spellIconMap}
                       onEntriesChange={handleEntriesChange}
+                      suggestedEntries={suggestedEntries}
+                      onAcceptSuggestion={handleAcceptSuggestion}
                     />
                   </div>
                 )}

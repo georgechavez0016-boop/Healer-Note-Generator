@@ -11,6 +11,8 @@ interface TimelineProps {
   phaseDurations: Record<number, number>;
   spellIconMap: Record<number, SpellInfo>;
   onEntriesChange: (entries: EditableEntry[]) => void;
+  suggestedEntries: EditableEntry[];
+  onAcceptSuggestion: (entry: EditableEntry) => void;
 }
 
 const SPEC_COLORS: Record<string, string> = {
@@ -82,10 +84,11 @@ function assignLanes<T extends { time: number }>(items: T[]): Array<{ item: T; l
   });
 }
 
-export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap, onEntriesChange }: TimelineProps) {
+export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap, onEntriesChange, suggestedEntries, onAcceptSuggestion }: TimelineProps) {
   const phases = Object.keys(phaseDurations).map(Number).sort((a, b) => a - b);
   const [hiddenBossSpells, setHiddenBossSpells] = useState<Set<number>>(new Set());
   const [addDropdownKey, setAddDropdownKey] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   function toggleBossSpell(spellId: number) {
     setHiddenBossSpells(prev => {
@@ -138,6 +141,25 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
 
   return (
     <div style={{ width: '100%' }}>
+      {suggestedEntries.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button
+            onClick={() => setShowSuggestions(s => !s)}
+            style={{
+              fontSize: 11,
+              padding: '3px 10px',
+              borderRadius: 4,
+              border: `1px solid ${showSuggestions ? '#3b82f6' : '#374151'}`,
+              background: showSuggestions ? 'rgba(59,130,246,0.12)' : '#1f2937',
+              color: showSuggestions ? '#93c5fd' : '#6b7280',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {showSuggestions ? '◈ Suggestions on' : '◇ Suggestions off'} ({suggestedEntries.length})
+          </button>
+        </div>
+      )}
       {phases.map(phase => {
         const duration = phaseDurations[phase];
         const phaseEntries = entries.filter(e => e.phase === phase);
@@ -215,10 +237,20 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
             {/* Healer rows */}
             {players.map(player => {
               const playerEntries = phaseEntries.filter(e => e.playerName === player.name);
-              if (playerEntries.length === 0) return null;
+              const playerSuggestions = showSuggestions
+                ? suggestedEntries.filter(s => s.playerName === player.name && s.phase === phase)
+                : [];
+              if (playerEntries.length === 0 && playerSuggestions.length === 0) return null;
               const rowKey = `${phase}-${player.name}`;
               const specColor = SPEC_COLORS[player.spec] ?? '#9ca3af';
-              const assigned = assignLanes(playerEntries);
+
+              // Assign lanes across real + suggested together so they don't overlap
+              type TaggedEntry = EditableEntry & { isSuggested: boolean };
+              const allForRow: TaggedEntry[] = [
+                ...playerEntries.map(e => ({ ...e, isSuggested: false })),
+                ...playerSuggestions.map(e => ({ ...e, isSuggested: true })),
+              ];
+              const assigned = assignLanes(allForRow);
               const maxLane = assigned.reduce((m, a) => Math.max(m, a.lane), 0);
               const rowH = (maxLane + 1) * SLOT_H + ROW_PAD * 2;
               return (
@@ -293,10 +325,38 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                     ))}
                     {assigned.map(({ item: entry, lane }) => {
                       const topPx = ROW_PAD + lane * SLOT_H;
+                      const spellName = spellIconMap[entry.spellId]?.name ?? SPELL_NAMES[entry.spellId] ?? `Spell ${entry.spellId}`;
+                      if (entry.isSuggested) {
+                        return (
+                          <div
+                            key={entry.id}
+                            title={`Suggested: ${spellName}\n${formatSeconds(entry.time)} — CD available, aligns with boss mechanic\nClick to add to note`}
+                            onClick={() => onAcceptSuggestion(entry)}
+                            style={{
+                              position: 'absolute',
+                              left: `${(entry.time / duration) * 100}%`,
+                              top: topPx,
+                              transform: 'translateX(-50%)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 2,
+                              opacity: 0.45,
+                              userSelect: 'none',
+                            }}
+                          >
+                            <div style={{ border: `2px dashed ${specColor}`, borderRadius: 5, overflow: 'hidden' }}>
+                              <SpellIcon spellId={entry.spellId} spellIconMap={spellIconMap} size={ICON_SIZE} />
+                            </div>
+                            <span style={{ fontSize: 8, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatSeconds(entry.time)}</span>
+                          </div>
+                        );
+                      }
                       return (
                         <div
                           key={entry.id}
-                          title={`${spellIconMap[entry.spellId]?.name ?? SPELL_NAMES[entry.spellId] ?? `Spell ${entry.spellId}`}\n${formatSeconds(entry.time)} — ${Math.round(entry.frequency * 100)}% of logs\nDrag to adjust`}
+                          title={`${spellName}\n${formatSeconds(entry.time)} — ${entry.frequency > 0 ? `${Math.round(entry.frequency * 100)}% of logs` : 'manually added'}\nDrag to adjust`}
                           onPointerDown={e => handleIconPointerDown(e, entry, duration)}
                           style={{
                             position: 'absolute',
