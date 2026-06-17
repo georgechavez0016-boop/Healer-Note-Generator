@@ -207,9 +207,16 @@ export default function Home() {
       for (let i = 1; i <= sorted.length; i++) {
         const nextUseAbs = i < sorted.length ? toAbs(sorted[i].phase, sorted[i].time) : totalDuration;
 
-        // Fill the gap [availableAt, nextUseAbs) with boss-mechanic-aligned suggestions
-        while (availableAt < nextUseAbs - 5) {
-          const mech = sortedBoss.find(b => b.abs >= availableAt && b.abs < nextUseAbs - 5);
+        // Fill the gap [availableAt, nextUseAbs) with boss-mechanic-aligned suggestions.
+        // Mid-fight: only suggest at mechanic T if T+cd<=nextUseAbs, so the suggested use
+        // doesn't conflict with the next recorded cast. Gaps smaller than one CD are skipped.
+        // Last gap (end of fight): just need enough fight time remaining.
+        const isLastGap = i === sorted.length;
+        while (isLastGap ? availableAt < totalDuration - 10 : availableAt + cd <= nextUseAbs) {
+          const mech = sortedBoss.find(b =>
+            b.abs >= availableAt &&
+            (isLastGap ? b.abs < totalDuration - 10 : b.abs + cd <= nextUseAbs)
+          );
           if (!mech) break;
           // Avoid duplicating an already-existing entry at the same spot
           const alreadyExists = editableEntries.some(
