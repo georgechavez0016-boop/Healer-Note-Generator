@@ -49,13 +49,23 @@ export async function GET(req: NextRequest) {
     if (result) return new NextResponse(result.buffer, { headers: { 'Content-Type': result.contentType, ...CACHE_HEADERS } });
   }
 
-  // 2. Wowhead tooltip API to discover the correct slug dynamically
+  // 2. WCL-provided slug passed as a hint (avoids Wowhead round-trip for boss spells)
+  const hintSlug = req.nextUrl.searchParams.get('slug');
+  if (hintSlug) {
+    const slug = hintSlug.replace(/\.jpg$/i, ''); // strip extension if WCL included it
+    const result = await fetchBinary(
+      `https://wow.zamimg.com/images/wow/icons/medium/${slug}.jpg`
+    );
+    if (result) return new NextResponse(result.buffer, { headers: { 'Content-Type': result.contentType, ...CACHE_HEADERS } });
+  }
+
+  // 3. Wowhead tooltip API to discover the correct slug dynamically
   const discoveredSlug = await discoverSlugFromWowhead(spellId);
   if (discoveredSlug) {
-    const result3 = await fetchBinary(
+    const result = await fetchBinary(
       `https://wow.zamimg.com/images/wow/icons/medium/${discoveredSlug}.jpg`
     );
-    if (result3) return new NextResponse(result3.buffer, { headers: { 'Content-Type': result3.contentType, ...CACHE_HEADERS } });
+    if (result) return new NextResponse(result.buffer, { headers: { 'Content-Type': result.contentType, ...CACHE_HEADERS } });
   }
 
   return new NextResponse(null, { status: 404 });
