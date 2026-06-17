@@ -60,6 +60,7 @@ const REPORT_QUERY = `
             startTime
           }
         }
+        playerDetails(fightIDs: [$fightID])
         healerEvents: events(
           startTime: 0
           endTime: 99999999
@@ -145,11 +146,26 @@ interface CastEvent {
 
 interface AbilityInfo { gameID: number; name: string; icon: string; }
 
+interface PlayerDetailEntry {
+  name: string;
+  id: number;
+  type: string;
+  spec?: string;
+  specs?: Array<{ spec: string; count: number }>;
+}
+
 interface ReportData {
   reportData: {
     report: {
       masterData: { abilities: AbilityInfo[] };
       fights: Fight[];
+      playerDetails?: {
+        data?: {
+          playerDetails?: {
+            healers?: PlayerDetailEntry[];
+          };
+        };
+      };
       healerEvents: { data: CastEvent[]; nextPageTimestamp: number | null };
       bossEvents: { data: CastEvent[]; nextPageTimestamp: number | null };
     };
@@ -364,11 +380,24 @@ export async function POST(req: NextRequest) {
             logCasts.get(spec)?.push({ spellId, phase, timeInPhase });
           }
 
-          // Composition check: only count this log if enough required specs
-          // actually cast tracked spells in this fight.
-          const specsPresent = requiredSpecs.filter(
-            s => (logCasts.get(s)?.length ?? 0) > 0
-          );
+          // Composition check: use playerDetails healer roles (authoritative).
+          // Falls back to cast inference only if playerDetails is absent.
+          const healerRoles = report.playerDetails?.data?.playerDetails?.healers;
+          let specsPresent: HealerSpec[];
+          if (healerRoles && healerRoles.length > 0) {
+            const healerSpecsInLog = new Set<HealerSpec>();
+            for (const healer of healerRoles) {
+              const specName = healer.spec ?? healer.specs?.[0]?.spec;
+              if (!specName) continue;
+              const mapped = WCL_SPEC_MAP[`${healer.type}-${specName}`];
+              if (mapped) healerSpecsInLog.add(mapped);
+            }
+            specsPresent = requiredSpecs.filter(s => healerSpecsInLog.has(s));
+          } else {
+            specsPresent = requiredSpecs.filter(
+              s => (logCasts.get(s)?.length ?? 0) > 0
+            );
+          }
           if (specsPresent.length < requiredSpecCount) return;
 
           // Composition verified — merge into main accumulator
