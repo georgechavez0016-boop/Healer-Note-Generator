@@ -174,7 +174,7 @@ function compositionMatchesRequiredSpecs(
   required: HealerSpec[],
   minMatches: number
 ): boolean {
-  if (!composition?.length) return true; // no composition data → include optimistically
+  if (!composition?.length) return true; // no composition data from rankings → verified post-hoc during event processing
 
   const found = new Set<HealerSpec>();
 
@@ -349,19 +349,31 @@ export async function POST(req: NextRequest) {
             nextPage = moreEvents.nextPageTimestamp;
           }
 
-          // Map each cast to spec + phase-relative time
+          // Collect this log's healer casts into a per-spec buffer first
+          // so we can verify composition before merging into the main accumulator
+          const logCasts = new Map<string, RawCast[]>(
+            requiredSpecs.map(s => [s, []])
+          );
+
           for (const event of events) {
             if (event.type !== 'cast') continue;
             const spellId = event.abilityGameID;
             const spec = SPELL_TO_SPEC[spellId];
-            if (!spec || !requiredSpecs.includes(spec)) continue;
+            if (!spec || !requiredSpecs.includes(spec as HealerSpec)) continue;
+            const { phase, timeInPhase } = getPhaseForTimestamp(event.timestamp, phases);
+            logCasts.get(spec)?.push({ spellId, phase, timeInPhase });
+          }
 
-            const { phase, timeInPhase } = getPhaseForTimestamp(
-              event.timestamp,
-              phases
-            );
+          // Composition check: only count this log if enough required specs
+          // actually cast tracked spells in this fight.
+          const specsPresent = requiredSpecs.filter(
+            s => (logCasts.get(s)?.length ?? 0) > 0
+          );
+          if (specsPresent.length < requiredSpecCount) return;
 
-            castsBySpec.get(spec)?.push({ spellId, phase, timeInPhase });
+          // Composition verified — merge into main accumulator
+          for (const [spec, casts] of logCasts) {
+            castsBySpec.get(spec)?.push(...casts);
           }
 
           // collect ability info from masterData
