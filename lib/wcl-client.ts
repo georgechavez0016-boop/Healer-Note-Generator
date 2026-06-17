@@ -35,29 +35,44 @@ async function getAccessToken(): Promise<string> {
 
 export async function wclQuery<T = unknown>(
   query: string,
-  variables: Record<string, unknown> = {}
+  variables: Record<string, unknown> = {},
+  retries = 3
 ): Promise<T> {
   const token = await getAccessToken();
 
-  const res = await fetch('https://www.warcraftlogs.com/api/v2/client', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch('https://www.warcraftlogs.com/api/v2/client', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`WCL API HTTP error: ${res.status} ${text}`);
+    if (res.status === 429) {
+      if (attempt === retries) {
+        const text = await res.text();
+        throw new Error(`WCL API HTTP error: 429 ${text}`);
+      }
+      // Exponential backoff: 2s, 4s, 8s
+      await sleep(2000 * Math.pow(2, attempt));
+      continue;
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`WCL API HTTP error: ${res.status} ${text}`);
+    }
+
+    const json = await res.json();
+    if (json.errors?.length) {
+      throw new Error(`WCL GraphQL errors: ${json.errors.map((e: { message: string }) => e.message).join('; ')}`);
+    }
+    return json.data as T;
   }
 
-  const json = await res.json();
-  if (json.errors?.length) {
-    throw new Error(`WCL GraphQL errors: ${json.errors.map((e: { message: string }) => e.message).join('; ')}`);
-  }
-  return json.data as T;
+  throw new Error('WCL API: exceeded retries');
 }
 
 // Small helper to avoid hammering the API — waits between batched calls

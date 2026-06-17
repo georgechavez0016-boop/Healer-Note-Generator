@@ -323,7 +323,7 @@ export async function POST(req: NextRequest) {
   const abilityInfoMap = new Map<number, { name: string; icon: string }>();
 
   let processedLogs = 0;
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 3;
   const fetchErrors: string[] = [];
   const usedLogs: Array<{ code: string; fightID: number; duration?: number }> = [];
 
@@ -429,7 +429,7 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    if (i + BATCH_SIZE < matchingLogs.length) await sleep(300);
+    if (i + BATCH_SIZE < matchingLogs.length) await sleep(500);
   }
 
   if (processedLogs === 0) {
