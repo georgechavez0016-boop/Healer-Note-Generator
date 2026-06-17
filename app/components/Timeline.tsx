@@ -35,13 +35,19 @@ const SPEC_ICONS: Record<string, string> = {
 
 function SpellIcon({ spellId, spellIconMap, size = 32 }: { spellId: number; spellIconMap: Record<number, SpellInfo>; size?: number }) {
   const [failed, setFailed] = useState(false);
-  const spellName = spellIconMap[spellId]?.name ?? SPELL_NAMES[spellId];
+  const info = spellIconMap[spellId];
+  const spellName = info?.name ?? SPELL_NAMES[spellId];
+  // Prefer direct Zamimg URL using the WCL-provided icon slug — avoids the proxy's
+  // Wowhead round-trip, which is slow and unreliable for boss ability spell IDs.
+  const src = info?.icon
+    ? `https://wow.zamimg.com/images/wow/icons/medium/${info.icon}.jpg`
+    : `/api/icon?id=${spellId}`;
 
   return (
     <div style={{ width: size, height: size, borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
       {!failed ? (
         <img
-          src={`/api/icon?id=${spellId}`}
+          src={src}
           width={size}
           height={size}
           alt={spellName ?? String(spellId)}
