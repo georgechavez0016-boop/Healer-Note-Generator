@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { EditableEntry, BossAbility, SpellInfo } from '@/types';
-import { SPEC_LABELS, SPELL_ICONS, SPELL_NAMES } from '@/lib/cooldowns';
+import { SPEC_LABELS, SPELL_ICONS, SPELL_NAMES, MAJOR_COOLDOWNS } from '@/lib/cooldowns';
 import type { HealerSpec } from '@/lib/cooldowns';
 
 interface TimelineProps {
@@ -81,6 +81,7 @@ function assignLanes<T extends { time: number }>(items: T[]): Array<{ item: T; l
 export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap, onEntriesChange }: TimelineProps) {
   const phases = Object.keys(phaseDurations).map(Number).sort((a, b) => a - b);
   const [hiddenBossSpells, setHiddenBossSpells] = useState<Set<number>>(new Set());
+  const [addDropdownKey, setAddDropdownKey] = useState<string | null>(null);
 
   function toggleBossSpell(spellId: number) {
     setHiddenBossSpells(prev => {
@@ -224,14 +225,58 @@ export function Timeline({ entries, bossAbilities, phaseDurations, spellIconMap,
                   onPointerUp={handlePointerUp}
                 >
                   {/* Label */}
-                  <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 12px', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ fontSize: 14 }}>{SPEC_ICONS[player.spec] ?? '💊'}</span>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{player.name}</div>
-                        <div style={{ fontSize: 9, color: specColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90 }}>{SPEC_LABELS[player.spec as HealerSpec] ?? player.spec}</div>
+                  <div style={{ width: LABEL_W, flexShrink: 0, padding: '0 8px 0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{SPEC_ICONS[player.spec] ?? '💊'}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 72 }}>{player.name}</div>
+                        <div style={{ fontSize: 9, color: specColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 72 }}>{SPEC_LABELS[player.spec as HealerSpec] ?? player.spec}</div>
                       </div>
                     </div>
+
+                    {/* Add spell button */}
+                    <button
+                      title="Add a cooldown to this row"
+                      onClick={() => setAddDropdownKey(addDropdownKey === rowKey ? null : rowKey)}
+                      style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 4, background: addDropdownKey === rowKey ? '#374151' : '#1f2937', border: '1px solid #374151', color: '#9ca3af', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                    >
+                      +
+                    </button>
+
+                    {/* Spell picker dropdown */}
+                    {addDropdownKey === rowKey && (
+                      <>
+                        {/* Click-away backdrop */}
+                        <div onClick={() => setAddDropdownKey(null)} style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+                        <div style={{ position: 'absolute', top: '100%', left: 8, zIndex: 100, width: 200, background: '#111827', border: '1px solid #374151', borderRadius: 6, padding: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
+                          <div style={{ fontSize: 9, color: '#6b7280', padding: '2px 8px 4px', textTransform: 'uppercase', letterSpacing: 1 }}>Add to {player.name}</div>
+                          {(MAJOR_COOLDOWNS[player.spec as HealerSpec] ?? []).map(spellId => (
+                            <button
+                              key={spellId}
+                              onClick={() => {
+                                const newEntry: EditableEntry = {
+                                  id: `manual-${Date.now()}-${spellId}`,
+                                  phase,
+                                  time: Math.round(duration / 2),
+                                  spec: player.spec,
+                                  spellId,
+                                  playerName: player.name,
+                                  frequency: 1,
+                                };
+                                onEntriesChange([...entries, newEntry]);
+                                setAddDropdownKey(null);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '5px 8px', background: 'transparent', border: 'none', cursor: 'pointer', borderRadius: 4, color: '#e5e7eb', textAlign: 'left' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1f2937'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
+                              <SpellIcon spellId={spellId} spellIconMap={spellIconMap} size={22} />
+                              <span style={{ fontSize: 11 }}>{SPELL_NAMES[spellId] ?? `Spell ${spellId}`}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Timeline area */}
